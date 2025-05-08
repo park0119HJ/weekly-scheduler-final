@@ -2,7 +2,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -16,10 +16,12 @@ def init_db():
         CREATE TABLE IF NOT EXISTS schedules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             class_name TEXT,
-            week_start_date TEXT,
+            week TEXT,
             day TEXT,
-            content TEXT,
-            last_update TEXT
+            date TEXT,
+            homework TEXT,
+            material TEXT,
+            published INTEGER DEFAULT 0
         )
     """)
     conn.commit()
@@ -43,24 +45,31 @@ class_codes = {
     "여호수아반": "joshua2024",
 }
 
+def get_weeks():
+    today = datetime.today()
+    weeks = []
+    for i in range(-2, 5):
+        monday = (today + timedelta(weeks=i)).replace(day=1)
+        monday += timedelta(days=(7 - monday.weekday()) % 7)
+        weeks.append(monday.strftime("%Y-%m-%d"))
+    return weeks
+
 @app.route("/")
 def home():
-    return "접속 성공! /teacher/login 또는 /parent/반이름 으로 이동하세요."
+    return "접속 성공! /teacher/login 또는 /parent/이삭반 으로 접속하세요."
 
 @app.route("/teacher/login", methods=["GET", "POST"])
 def teacher_login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-
         user = teachers.get(username)
         if user and user["password"] == password:
             session["username"] = username
             session["class_name"] = user["class_name"]
-            return redirect(url_for("teacher", class_name=user["class_name"]))
+            return redirect(url_for("teacher_write", class_name=user["class_name"]))
         else:
             return "로그인 실패"
-
     return render_template("teacher_login.html")
 
 @app.route("/teacher/logout")
@@ -69,46 +78,51 @@ def logout():
     return redirect(url_for("teacher_login"))
 
 @app.route("/teacher/<class_name>", methods=["GET", "POST"])
-def teacher(class_name):
+def teacher_write(class_name):
     if "username" not in session or session["class_name"] != class_name:
         return redirect(url_for("teacher_login"))
 
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
+    weeks = get_weeks()
+    selected_week = request.args.get("week", weeks[0])
 
     if request.method == "POST":
-        week_start_date = request.form["week_start_date"]
-        for day in ["월", "화", "수", "목", "금"]:
-            content = request.form.get(day, "")
-            c.execute("INSERT INTO schedules (class_name, week_start_date, day, content, last_update) VALUES (?, ?, ?, ?, ?)", 
-                      (class_name, week_start_date, day, content, datetime.now()))
+        selected_week = request.form["week"]
+        action = request.form["action"]
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        for i, day in enumerate(["월", "화", "수", "목", "금"]):
+            homework = request.form.get(f"homework_{i}", "")
+            material = request.form.get(f"material_{i}", "")
+            date = (datetime.strptime(selected_week, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d")
+            c.execute("INSERT INTO schedules (class_name, week, day, date, homework, material, published) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                      (class_name, selected_week, day, date, homework, material, 1 if action == "publish" else 0))
         conn.commit()
-        return redirect(f"/teacher/{class_name}")
+        conn.close()
+        return redirect(url_for("teacher_write", class_name=class_name, week=selected_week))
 
-    c.execute("SELECT week_start_date, day, content FROM schedules WHERE class_name = ? ORDER BY id DESC", (class_name,))
-    schedules = c.fetchall()
-    conn.close()
-    return render_template("teacher_page.html", class_name=class_name, schedules=schedules)
+    dates = [(datetime.strptime(selected_week, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
+    return render_template("teacher_write_table.html", weeks=weeks, selected_week=selected_week, dates=dates)
 
-@app.route("/parent/<class_name>", methods=["GET", "POST"])
+@app.route("/parent/<class_name>", methods=["GET"])
 def parent(class_name):
     if session.get(f"parent_access_{class_name}") != True:
-        if request.method == "POST":
-            code = request.form["class_code"]
-            if code == class_codes.get(class_name):
+        if request.args.get("code"):
+            if request.args.get("code") == class_codes.get(class_name):
                 session[f"parent_access_{class_name}"] = True
                 return redirect(url_for("parent", class_name=class_name))
             else:
                 return "학급코드가 틀렸습니다"
-
         return render_template("parent_code.html", class_name=class_name)
 
+    weeks = get_weeks()
+    selected_week = request.args.get("week", weeks[0])
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT week_start_date, day, content FROM schedules WHERE class_name = ? ORDER BY id DESC", (class_name,))
-    schedules = c.fetchall()
+    c.execute("SELECT day, date, homework, material FROM schedules WHERE class_name = ? AND week = ? AND published = 1 ORDER BY id",
+              (class_name, selected_week))
+    data = c.fetchall()
     conn.close()
-    return render_template("parent_page.html", class_name=class_name, schedules=schedules)
+    return render_template("parent_page.html", class_name=class_name, weeks=weeks, selected_week=selected_week, schedule_data=data)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -1,8 +1,28 @@
 
-<h1>{{ class_name }} 학부모 페이지</h1>
-<h2>공지된 내용</h2>
-<ul>
-    {% for week_start_date, day, content in schedules %}
-    <li>{{ week_start_date }} / {{ day }}: {{ content }}</li>
+<h2>{{ class_name }} 학부모용 숙제 & 준비물</h2>
+
+<form method="GET">
+    <label>주차 선택:</label>
+    <select name="week" onchange="this.form.submit()">
+        {% for week in weeks %}
+        <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>{{ week }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+<table border="1" style="width:100%; text-align:center;">
+    <tr>
+        <th>요일</th>
+        <th>날짜</th>
+        <th>숙제</th>
+        <th>준비물</th>
+    </tr>
+    {% for day, date, homework, material in schedule_data %}
+    <tr>
+        <td>{{ day }}</td>
+        <td>{{ date }}</td>
+        <td>{{ homework if homework else '없음' }}</td>
+        <td>{{ material if material else '없음' }}</td>
+    </tr>
     {% endfor %}
-</ul>
+</table>
