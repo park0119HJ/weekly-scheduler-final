@@ -1,34 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>주간 학습 안내 입력</title>
+</head>
+<body>
+    <h1>주간 학습 안내 입력</h1>
 
-<h2>주간 숙제/준비물 입력</h2>
-<form method="POST">
-    <label>주차 선택:</label>
-    <select name="week" onchange="this.form.submit()">
-        {% for week in weeks %}
-        <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>{{ week }}</option>
-        {% endfor %}
-    </select>
-</form>
+    <form method="post">
+        반 이름:
+        <input type="text" name="class_name" required><br><br>
 
-<form method="POST">
-    <input type="hidden" name="week" value="{{ selected_week }}">
-    <table border="1" style="width:100%; text-align:center;">
-        <tr>
-            {% for day in ["월", "화", "수", "목", "금"] %}
-            <th>{{ day }}요일 ({{ dates[loop.index0] }})</th>
+        년도: {{ year }}<br>
+        월: {{ month }}<br>
+
+        주차:
+        <select name="week" onchange="this.form.submit()">
+            <option value="">주차를 선택하세요</option>
+            {% for w in weeks %}
+                <option value="{{w}}" {% if selected_week == w %}selected{% endif %}>{{w}}주차</option>
             {% endfor %}
-        </tr>
-        <tr>
-            {% for day in ["월", "화", "수", "목", "금"] %}
-            <td><input type="text" name="homework_{{ loop.index0 }}" placeholder="숙제"></td>
+        </select>
+    </form>
+
+    {% if selected_dates %}
+    <form method="post">
+        <input type="hidden" name="class_name" value="">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="week" value="{{ selected_week }}">
+
+        <table border="1">
+            <tr>
+                <th>요일</th>
+                <th>날짜</th>
+                <th>숙제</th>
+                <th>준비물</th>
+            </tr>
+            {% for i in range(5) %}
+            <tr>
+                <td>{{ ['월', '화', '수', '목', '금'][i] }}</td>
+                <td>
+                    <input type="text" name="date_{{i}}" value="{{ selected_dates[i].strftime('%Y-%m-%d') }}" readonly>
+                </td>
+                <td>
+                    <input type="text" name="homework_{{i}}">
+                </td>
+                <td>
+                    <input type="text" name="items_{{i}}">
+                </td>
+            </tr>
             {% endfor %}
-        </tr>
-        <tr>
-            {% for day in ["월", "화", "수", "목", "금"] %}
-            <td><input type="text" name="material_{{ loop.index0 }}" placeholder="준비물"></td>
-            {% endfor %}
-        </tr>
-    </table>
-    <br>
-    <button type="submit" name="action" value="save">저장</button>
-    <button type="submit" name="action" value="publish">배포</button>
-</form>
+        </table>
+
+        <br>
+        <button type="submit">저장</button>
+    </form>
+    {% endif %}
+
+</body>
+</html>
