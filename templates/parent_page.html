@@ -1,0 +1,8 @@
+
+<h1>{{ class_name }} 학부모 페이지</h1>
+<h2>공지된 내용</h2>
+<ul>
+    {% for week_start_date, day, content in schedules %}
+    <li>{{ week_start_date }} / {{ day }}: {{ content }}</li>
+    {% endfor %}
+</ul>
